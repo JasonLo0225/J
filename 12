@@ -1,0 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep 11 23:50:47 2024
+
+@author: jason
+"""
+
+import pandas as pd
+import numpy
+import requests
+import chardet
+
+
+with open('C:\\Users\jason\Downloads\MI_INDEX_ALLBUT0999_20240911.csv', 'rb') as f:
+    result = chardet.detect(f.read())
+    print(result['encoding'])  
+
+encoding = 'big5hkscs'  # 假設檢測到的編碼是 Big5-HKSCS
+with open('C:\\Users\jason\Downloads\MI_INDEX_ALLBUT0999_20240911.csv', 'r', encoding=encoding) as f:
+    content = f.read()
