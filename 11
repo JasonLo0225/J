@@ -1,0 +1,33 @@
+import requests
+import pandas as pd
+import yfinance as yf
+from backtesting import Backtest, Strategy #引入回測和交易策略功能
+
+from backtesting.lib import crossover #從lib子模組引入判斷均線交會功能
+from backtesting.test import SMA #從test子模組引入繪製均線功能
+
+def getMdata(sto_id,st_date,ed_date,period):
+    a = yf.download(sto_id,st_date,ed_date,period)
+    a.columns = [i for i in a.columns]
+    return a
+
+
+class SmaCross(Strategy): #交易策略命名為SmaClass，使用backtesting.py的Strategy功能
+    n1 = 5 #設定第一條均線日數為5日(周線)
+    n2 = 20 #設定第二條均線日數為20日(月線)，這邊的日數可自由調整
+
+    def init(self):
+        self.sma1 = self.I(SMA, self.data.Close, self.n1) #定義第一條均線為sma1，使用backtesting.py的SMA功能算繪
+        self.sma2 = self.I(SMA, self.data.Close, self.n2) #定義第二條均線為sma2，使用backtesting.py的SMA功能算繪
+
+    def next(self):
+        if crossover(self.sma1, self.sma2): #如果周線衝上月線，表示近期是上漲的，則買入
+            self.buy()
+        elif crossover(self.sma2, self.sma1): #如果周線再與月線交叉，表示開始下跌了，則賣出
+            self.sell()
+            
+data = getMdata("2603.TW", "2023-08-10" , "2024-08-15" , "10m")
+print(data.head)
+test = Backtest(data, SmaCross, cash=10000, commission=.002)
+result = test.run()
+print(result)
