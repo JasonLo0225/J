@@ -1,29 +1,51 @@
+import pandas as pd
+import numpy
+import requests
+import chardet
+
+def getMdata(csv):
+    a = pd.read_csv(csv)
+    a.columns = [i for i in a.columns]
+    return a
+data = getMdata("C:/Users/92275/Downloads/000.csv")
+data1 = data.set_index("Date")
+print(data1)
+position = 0
+bg = 100000
+pdF = pd.DataFrame()
 for d in range(data.shape[0]-1):
     c_time = data.index[d]
-    c_open = data.loc[c_time,"open"]
-    c_close = data.loc[c_time,"close"]
-    c_high = data.loc[c_time,"high"]
-    c_low = data.loc[c_time,"low"]
+    date = data.loc[c_time,"Date"]
+    time = data.loc[c_time,"Time"]
+    c_open = data.loc[c_time,"Open"]
+    c_close = data.loc[c_time,"Close"]
+    c_high = data.loc[c_time,"High"]
+    c_low = data.loc[c_time,"Low"]
     n_time = data.index[d+1]
-    n_open = data.loc[n_time,"open"]
-    
+    date1 = data.loc[n_time,"Date"]
+    time1 = data.loc[n_time,"Time"]
+    n_open = data.loc[n_time,"Open"]
+  
     if position == 0:
         if (c_close<c_open) and (c_high == c_open) and (c_close-c_open) < (c_low-c_close)*2:
             position = -1
             order_d = d
-            order_time = n_time
             order_price = n_open
             order_unit = 1
-            print(c_time,"觸發進場訊號 隔日進場",order_time,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
+            print(date,time,"觸發進場訊號 隔日進場",date1,time1,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
             
     elif position == -1:
-        if (c_low-c_close < c_close - c_open and c_close < c_open):
+        if (c_low-c_close < c_close - c_open and c_close < order_price):
+            position = 0 
+            cover_price = n_open
+            cover_time = n_time
+            bg_loss = bg*(1+(order_price-cover_price)/order_price)-bg
+            
+            print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場價",cover_price,"部位",position,bg_loss)
+            
+        elif c_close > order_price :
             position = 0
             cover_price = n_open
             cover_time = n_time
-            print(c_time,"觸發出場訊號 隔日進場",cover_time,"出場價",cover_price,"部位",position)
-        elif ((c_close - order_price)/order_price) **2 > 0.0036 and c_close < order_price :
-            position = 0
-            cover_price = n_open
-            cover_time = n_time
-            print(c_time,"觸發出場訊號 隔日進場",cover_time,"出場1",cover_price,"部位",position)
+            bg_get = bg*(1+(order_price-cover_price)/order_price)-bg
+            print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場",cover_price,"部位",position,bg_get)
