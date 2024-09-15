@@ -1,7 +1,15 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Sep 15 23:01:55 2024
+
+@author: jason
+"""
+
 import pandas as pd
 import numpy
 import requests
 import chardet
+import mplfinance as mpf
 
 def getMdata(csv):
     a = pd.read_csv(csv)
@@ -11,6 +19,7 @@ data = getMdata("C:/Users/92275/Downloads/000.csv")
 data1 = data.set_index("Date")
 print(data1)
 position = 0
+trade = pd.DataFrame()
 bg = 100000
 pdF = pd.DataFrame()
 for d in range(data.shape[0]-1):
@@ -49,3 +58,62 @@ for d in range(data.shape[0]-1):
             cover_time = n_time
             bg_get = bg*(1+(order_price-cover_price)/order_price)-bg
             print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場",cover_price,"部位",position,bg_get)
+        
+        trade = trade.append(pd.Series(["Buy",date]))
+def ChartTrade(data,trade=pd.DataFrame(),addp=[],v_enable=True):
+    if trade.shape[0]>0:
+        trade1 = trade.copy()
+        buy_order_trade = trade[[2,3]]
+        buy_order_trade = buy_order_trade.index(2)
+        buy_order_trade.columns=["buy_order"]
+        buy_order_trade=buy_order_trade.drop.duplicates
+        buy_cover_trade = trade1[[4,5]]
+        buy_cover_trade = buy_order_trade.set.index(4)
+        buy_cover_trade.columns=["buy_cover"]
+        buy_cover_trade = buy_cover_trade.drop.duplicates()
+        
+        data=pd.concat([data,buy_order_trade,buy_cover_trade],axis=1)
+        
+        addp.append(mpf.make_addplot(data["buy_order"]
+                                     ,type="scatter",color="#FF4500",
+                                     marker="^",marketsize=50))
+        addp.append(mpf.make_addplot(data["buy_cover"]
+                                     ,type="scatter",color="#16982B",
+                                     marker="V",marketsize=50))
+    mcolor = mpf.make_marketcolors(up="r",down="g",inherit=True)
+    mstyle = mpf.make_mpf_style(base_mpf_style="yahoo",marketcolors = mcolor)
+    mpf.plot(data,addplot=addp , style=mstyle,type="candle",volume = v_enable)
+    
+def Performance(trade=pd.DataFrame(),prodtype="ETF"):
+    if trade.shape[0]== 0:
+        print("沒有交易紀錄")
+        return False
+    #交易成本
+    if prodtype=="ETF":
+        cost = 0.001+0.00285
+    elif prodtype=="Stock":
+        cost = 0.003+0.00285
+    else:
+        return False
+    trade1 = trade.copy()
+    trade1=trade1.sort.valueS(2)
+    trade1=trade1.reset.index(drop=True)
+    
+    trade1.columns=["Product","bs","order_time","order_price","cover_time","cover_price","order_unit"]
+    #計算每筆報酬率
+    trade1["ret"]=((trade1["cover_price"]-trade1["order_price"]-cost)/trade1["order_price"])*trade1["order_unit"]
+    print("總績效 %s "%(trade1["ret"].sum().round(4)))
+    print("交易次數 %s "%(trade1.shape[0]))
+    print("平均績效 %s "%(trade1["ret"].mean.round(4)))
+    earn_trade = trade1[trade1["ret"]>0]
+    earn_ratio = earn_trade .shape[0]/trade1.shape[0]
+    print("平均獲利 %s" %(round(earn_ratio,2)))
+    avg_earn = earn_trade["ret"].mean().round(4)
+    print("平均獲利 %s"%(avg_earn))
+    loss_trade = trade1[trade1["ret"]<=0]
+    loss_ratio = loss_trade["ret"].mean().round(4)
+    print("平均虧損 %s"%(loss_ratio))
+    odds=abs(avg_earn/loss_ratio)
+    print("賺賠比 %s"%(odds.round(4)))
+    #期望值
+    print("期望值 %s"%(((earn_ratio*odds)-(1-earn_ratio)).round(4)))
