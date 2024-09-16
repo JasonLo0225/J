@@ -15,7 +15,7 @@ def getMdata(csv):
     a = pd.read_csv(csv)
     a.columns = [i for i in a.columns]
     return a
-data = getMdata("C:/Users/92275/Downloads/15K.csv")
+data = getMdata("C:/Users/92275/Downloads/000.csv")
 data1 = data.set_index("Date")
 print(data1)
 position = 0
@@ -29,7 +29,6 @@ for d in range(data.shape[0]-1):
     time = data.loc[c_time,"Time"]
     c_open = data.loc[c_time,"Open"]
     c_close = data.loc[c_time,"Close"]
-    trade["Close"] = c_close
     c_high = data.loc[c_time,"High"]
     c_low = data.loc[c_time,"Low"]
     n_time = data.index[d+1]
@@ -37,9 +36,9 @@ for d in range(data.shape[0]-1):
     time1 = data.loc[n_time,"Time"]
     n_open = data.loc[n_time,"Open"]
     ma5 = data.loc[c_time,"5ma"]
-    ma10 = data.loc[c_time,"10ma"]
+    ma15 = data.loc[c_time,"15ma"]
     if position == 0:
-        if (c_close>data.loc[data.index[d-10],"Close"]) and c_close > ma5 and c_close > ma10:
+        if c_close > ma5 and c_close > ma15:
             position = 1
             order_d = d
             order_price = c_close
@@ -52,6 +51,7 @@ for d in range(data.shape[0]-1):
             count=count+1
             cover_price = data.loc[data.index[d-1],"Close"]
             bg_get = bg*(1+(cover_price-order_price)/order_price)-bg 
+            trade.loc[d,"get"] = bg_get
             print(date,time,"觸發出場訊號 隔日出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
         elif (c_close-order_price)>100:
             position = 0 
@@ -59,14 +59,16 @@ for d in range(data.shape[0]-1):
             cover_price = c_close
             cover_time = n_time
             bg_get = bg*(1+(cover_price-order_price)/order_price)-bg 
+            trade.loc[d,"get"] = bg_get
             print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場價",cover_price,"部位",position,bg_get,count)
         
-        elif (c_close - order_price) <-30:
+        elif (c_close - order_price) <-30 :
             position = 0
             count1=count1+1
-            cover_price = c_close
+            cover_price =order_price -30
             cover_time = c_time
             bg_loss = bg*(1+(cover_price-order_price)/order_price)-bg
+            trade.loc[d,"loss"] = bg_loss
             print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場",cover_price,"部位",position,bg_loss,count1)
    
 # def ChartTrade(data,trade=pd.DataFrame(),addp=[],v_enable=True):
@@ -93,43 +95,43 @@ for d in range(data.shape[0]-1):
 #     mstyle = mpf.make_mpf_style(base_mpf_style="yahoo",marketcolors = mcolor)
 #     mpf.plot(data,addplot=addp , style=mstyle,type="candle",volume = v_enable)
     
-def Performance(trade=pd.DataFrame()):
-    if trade.shape[0]== 0:
-        print("沒有交易紀錄")
-        return False
+# def Performance(trade=pd.DataFrame()):
+#     if trade.shape[0]== 0:
+#         print("沒有交易紀錄")
+#         return False
   
-    trade1 = trade.copy()
-    trade1=trade1.sort.valueS(2)
-    trade1=trade1.reset.index(drop=True)
+#     trade1 = trade.copy()
+#     trade1=trade1.sort.valueS(2)
+#     trade1=trade1.reset.index(drop=True)
     
-    print("交易次數 %s "%(trade1.shape[0]))
-    print("平均績效 %s "%(trade1["ret"].mean.round(4)))
-    earn_trade = trade1[trade1["ret"]>0]
-    earn_ratio = earn_trade .shape[0]/trade1.shape[0]
-    print("平均獲利 %s" %(round(earn_ratio,2)))
-    avg_earn = earn_trade["ret"].mean().round(4)
-    print("平均獲利 %s"%(avg_earn))
-    loss_trade = trade1[trade1["ret"]<=0]
-    loss_ratio = loss_trade["ret"].mean().round(4)
-    print("平均虧損 %s"%(loss_ratio))
-    odds=abs(avg_earn/loss_ratio)
-    print("賺賠比 %s"%(odds.round(4)))
-    #期望值
-    print("期望值 %s"%(((earn_ratio*odds)-(1-earn_ratio)).round(4)))
-    DD = []
-    NewHigh = []
-    TDD = 0 
-    MDD = 0 
-    acc_profit = 0 
-    for ret in trade1["ret"].value:
-        acc_profit = acc_profit + ret
-        TDD= TDD + ret
-        if TDD > 0:
-            TDD = 0  
-            NewHigh.append(acc_profit)
-        else:
-            NewHigh.append(None)
-            MDD = min(MDD,TDD)
-        DD.append(TDD)
-    print("最大資金回落",MDD.round(4))
-Performance()
+#     print("交易次數 %s "%(trade1.shape[0]))
+#     print("平均績效 %s "%(trade1["ret"].mean.round(4)))
+#     earn_trade = trade1[trade1["ret"]>0]
+#     earn_ratio = earn_trade .shape[0]/trade1.shape[0]
+#     print("平均獲利 %s" %(round(earn_ratio,2)))
+#     avg_earn = earn_trade["ret"].mean().round(4)
+#     print("平均獲利 %s"%(avg_earn))
+#     loss_trade = trade1[trade1["ret"]<=0]
+#     loss_ratio = loss_trade["ret"].mean().round(4)
+#     print("平均虧損 %s"%(loss_ratio))
+#     odds=abs(avg_earn/loss_ratio)
+#     print("賺賠比 %s"%(odds.round(4)))
+#     #期望值
+#     print("期望值 %s"%(((earn_ratio*odds)-(1-earn_ratio)).round(4)))
+#     DD = []
+#     NewHigh = []
+#     TDD = 0 
+#     MDD = 0 
+#     acc_profit = 0 
+#     for ret in trade1["ret"].value:
+#         acc_profit = acc_profit + ret
+#         TDD= TDD + ret
+#         if TDD > 0:
+#             TDD = 0  
+#             NewHigh.append(acc_profit)
+#         else:
+#             NewHigh.append(None)
+#             MDD = min(MDD,TDD)
+#         DD.append(TDD)
+#     print("最大資金回落",MDD.round(4))
+# Performance()
