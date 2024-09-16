@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Sep 15 23:01:55 2024
-
-@author: jason
-"""
-
 import pandas as pd
 import numpy
 import requests
@@ -15,7 +8,7 @@ def getMdata(csv):
     a = pd.read_csv(csv)
     a.columns = [i for i in a.columns]
     return a
-data = getMdata("C:/Users/92275/Downloads/000.csv")
+data = getMdata("C:/Users/92275/Downloads/1K 916.csv")
 data1 = data.set_index("Date")
 print(data1)
 position = 0
@@ -50,7 +43,7 @@ for d in range(data.shape[0]-1):
             position = 0 
             count=count+1
             cover_price = data.loc[data.index[d-1],"Close"]
-            bg_get = bg*(1+(cover_price-order_price)/order_price)-bg 
+            bg_get = 50*(bg*(1+(cover_price-order_price)/order_price)-bg) 
             trade.loc[d,"get"] = bg_get
             print(date,time,"觸發出場訊號 隔日出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
         elif (c_close-order_price)>100:
@@ -58,7 +51,7 @@ for d in range(data.shape[0]-1):
             count=count+1
             cover_price = c_close
             cover_time = n_time
-            bg_get = bg*(1+(cover_price-order_price)/order_price)-bg 
+            bg_get = 50*(bg*(1+(cover_price-order_price)/order_price)-bg )
             trade.loc[d,"get"] = bg_get
             print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場價",cover_price,"部位",position,bg_get,count)
         
@@ -67,10 +60,14 @@ for d in range(data.shape[0]-1):
             count1=count1+1
             cover_price =order_price -30
             cover_time = c_time
-            bg_loss = bg*(1+(cover_price-order_price)/order_price)-bg
+            bg_loss = 50*(bg*(1+(cover_price-order_price)/order_price)-bg)
             trade.loc[d,"loss"] = bg_loss
             print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場",cover_price,"部位",position,bg_loss,count1)
-   
+for i in range(trade.shape[0]):
+    get = trade.loc[trade.index[i],"get"]
+    loss = trade.loc[trade.index[i],"loss"]   
+    sumget = get + loss 
+    print(sumget)
 # def ChartTrade(data,trade=pd.DataFrame(),addp=[],v_enable=True):
 #     if trade.shape[0]>0:
 #         trade1 = trade.copy()
