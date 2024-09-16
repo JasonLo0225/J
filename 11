@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep 16 14:43:50 2024
+
+@author: 92275
+"""
+
 import pandas as pd
 import numpy
 import requests
@@ -31,7 +38,7 @@ for d in range(data.shape[0]-1):
     ma5 = data.loc[c_time,"5ma"]
     ma15 = data.loc[c_time,"15ma"]
     if position == 0:
-        if c_close > ma5 and c_close > ma15:
+        if c_close > ma5 and c_close > ma15 and c_close > c_open and data.loc[data.index[d+1],"Close"]> data.loc[data.index[d+1],"Open"]:
             position = 1
             order_d = d
             order_price = c_close
