@@ -11,15 +11,23 @@ import requests
 import chardet
 # import mplfinance as mpf
 
+
 def getMdata(csv):
     a = pd.read_csv(csv)
     a.columns = [i for i in a.columns]
     return a
-data = getMdata("C:/Users/92275/Downloads/1K 916.csv")
+data = getMdata("C:/Users/92275/Downloads/1K 999.csv")
 data1 = data.set_index("Date")
 print(data1)
 position = 0
-trade = pd.DataFrame()
+trade = pd.DataFrame(columns=[
+    "date",
+    "cover_time",
+    'Sell',
+    'cover_price',
+    '損益',
+    'get',
+    "ret"])
 bg = 100000
 count = 0
 count1 = 0
@@ -27,115 +35,167 @@ for d in range(data.shape[0]-1):
     c_time = data.index[d]
     date = data.loc[c_time,"Date"]
     time = data.loc[c_time,"Time"]
+    td_high = data.loc[data.index[0],"High"]
+    td_low = data.loc[data.index[0],"Low"]
     c_open = data.loc[c_time,"Open"]
     c_close = data.loc[c_time,"Close"]
     c_high = data.loc[c_time,"High"]
     c_low = data.loc[c_time,"Low"]
+    c_volumn = data.loc[c_time,"Volumn"]
     n_time = data.index[d+1]
     date1 = data.loc[n_time,"Date"]
     time1 = data.loc[n_time,"Time"]
     n_open = data.loc[n_time,"Open"]
-    ma5 = data.loc[c_time,"5ma"]
-    ma15 = data.loc[c_time,"15ma"]
+    max15 =data["High"].rolling(20).max()
+    cover_price_next = data.loc[n_time, "Close"]
+    volumn_next = data.loc[n_time, "Volumn"]
     if position == 0:
-        if c_close > ma5 and c_close > ma15 and c_close > c_open and data.loc[data.index[d+1],"Close"]> data.loc[data.index[d+1],"Open"]:
-            position = 1
+        if cover_price_next < max15[d] and volumn_next > c_volumn and c_close < td_low:
+            position = -1
             order_d = d
-            order_price = c_close
+            order_price = n_open
             order_unit = 1
-            print(date,time,"觸發進場訊號 隔日進場",date,time,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
+            print(date,time,"觸發進場訊號 進場",date,time,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
             
-    elif position == 1:
+    elif position == -1:
         if  (date > data.loc[data.index[d-1],"Date"]):
             position = 0 
             count=count+1
             cover_price = data.loc[data.index[d-1],"Close"]
+            cover_time = data.loc[data.index[d-1],"Time"]
             bg_get = 50*(bg*(1+(cover_price-order_price)/order_price)-bg) 
-            trade.loc[d,"get"] = bg_get
-            print(date,time,"觸發出場訊號 隔日出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
-        elif (c_close-order_price)>100:
+
+            print(date,time,"觸發出場訊號 出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
+            ret = 100*(bg_get/bg)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_get,
+                    ret
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+            # 使用 pd.concat 进行合并
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+        elif (c_close-order_price)< -45:
             position = 0 
             count=count+1
             cover_price = c_close
-            cover_time = n_time
-            bg_get = 50*(bg*(1+(cover_price-order_price)/order_price)-bg )
-            trade.loc[d,"get"] = bg_get
-            print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場價",cover_price,"部位",position,bg_get,count)
-        
-        elif (c_close - order_price) <-30 :
+            cover_time = time
+            bg_get = bg+50*(order_price-cover_price)-bg
+            print(date,cover_time,"觸發出場訊號 出場",date1,cover_time,"出場價",cover_price,"部位",position,bg_get,count)
+            ret = 100*(bg_get/bg)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_get,
+                    ret
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+            # 使用 pd.concat 进行合并
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+
+        elif (c_high - order_price) >25 :
             position = 0
             count1=count1+1
-            cover_price =order_price -30
-            cover_time = c_time
-            bg_loss = 50*(bg*(1+(cover_price-order_price)/order_price)-bg)
-            trade.loc[d,"loss"] = bg_loss
-            print(date,time,"觸發出場訊號 隔日進場",date1,time1,"出場",cover_price,"部位",position,bg_loss,count1)
-for i in range(trade.shape[0]):
-    get = trade.loc[trade.index[i],"get"]
-    loss = trade.loc[trade.index[i],"loss"]   
-    sumget = get + loss 
-    print(sumget)
-# def ChartTrade(data,trade=pd.DataFrame(),addp=[],v_enable=True):
-#     if trade.shape[0]>0:
-#         trade1 = trade.copy()
-#         buy_order_trade = trade[[2,3]]
-#         buy_order_trade = buy_order_trade.index(2)
-#         buy_order_trade.columns=["buy_order"]
-#         buy_order_trade=buy_order_trade.drop.duplicates
-#         buy_cover_trade = trade1[[4,5]]
-#         buy_cover_trade = buy_order_trade.set.index(4)
-#         buy_cover_trade.columns=["buy_cover"]
-#         buy_cover_trade = buy_cover_trade.drop.duplicates()
-        
-#         data=pd.concat([data,buy_order_trade,buy_cover_trade],axis=1)
-        
-#         addp.append(mpf.make_addplot(data["buy_order"]
-#                                      ,type="scatter",color="#FF4500",
-#                                      marker="^",marketsize=50))
-#         addp.append(mpf.make_addplot(data["buy_cover"]
-#                                      ,type="scatter",color="#16982B",
-#                                      marker="V",marketsize=50))
-#     mcolor = mpf.make_marketcolors(up="r",down="g",inherit=True)
-#     mstyle = mpf.make_mpf_style(base_mpf_style="yahoo",marketcolors = mcolor)
-#     mpf.plot(data,addplot=addp , style=mstyle,type="candle",volume = v_enable)
+            cover_price =order_price +20
+            cover_time = time
+            bg_loss = bg+50*(order_price-cover_price)-bg
+            ret = 100*(bg_loss/bg)
+            print(date,time,"觸發出場訊號 出場",date,cover_time,"出場",cover_price,"部位",position,bg_loss,count1)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_loss,
+                    ret
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+
+def Performance(trade=pd.DataFrame()):
+    if trade.shape[0] == 0:
+        print("沒有交易紀錄")
+        return False
     
-# def Performance(trade=pd.DataFrame()):
-#     if trade.shape[0]== 0:
-#         print("沒有交易紀錄")
-#         return False
-  
-#     trade1 = trade.copy()
-#     trade1=trade1.sort.valueS(2)
-#     trade1=trade1.reset.index(drop=True)
+    # 确保 'ret' 列存在
+    if 'ret' not in trade.columns:
+        print("DataFrame 中不包含 'ret' 列")
+        return False
     
-#     print("交易次數 %s "%(trade1.shape[0]))
-#     print("平均績效 %s "%(trade1["ret"].mean.round(4)))
-#     earn_trade = trade1[trade1["ret"]>0]
-#     earn_ratio = earn_trade .shape[0]/trade1.shape[0]
-#     print("平均獲利 %s" %(round(earn_ratio,2)))
-#     avg_earn = earn_trade["ret"].mean().round(4)
-#     print("平均獲利 %s"%(avg_earn))
-#     loss_trade = trade1[trade1["ret"]<=0]
-#     loss_ratio = loss_trade["ret"].mean().round(4)
-#     print("平均虧損 %s"%(loss_ratio))
-#     odds=abs(avg_earn/loss_ratio)
-#     print("賺賠比 %s"%(odds.round(4)))
-#     #期望值
-#     print("期望值 %s"%(((earn_ratio*odds)-(1-earn_ratio)).round(4)))
-#     DD = []
-#     NewHigh = []
-#     TDD = 0 
-#     MDD = 0 
-#     acc_profit = 0 
-#     for ret in trade1["ret"].value:
-#         acc_profit = acc_profit + ret
-#         TDD= TDD + ret
-#         if TDD > 0:
-#             TDD = 0  
-#             NewHigh.append(acc_profit)
-#         else:
-#             NewHigh.append(None)
-#             MDD = min(MDD,TDD)
-#         DD.append(TDD)
-#     print("最大資金回落",MDD.round(4))
-# Performance()
+    trade1 = trade.copy()
+    # 确保以某一列进行排序（假设这里是 'ret' 列）
+    trade1 = trade1.sort_values(by='ret')
+    trade1 = trade1.reset_index(drop=True)
+    
+    # 打印交易次数和平均绩效
+    print("交易次數 %s" % trade1.shape[0])
+    avg_ret = round(trade1["ret"].mean(), 4)
+    print("平均績效 %s" % avg_ret ,"%")
+    
+    earn_trade = trade1[trade1["ret"] > 0]
+    earn_ratio = earn_trade.shape[0] / trade1.shape[0] if trade1.shape[0] > 0 else 0
+    avg_earn = round(earn_trade["ret"].mean(), 4) if not earn_trade.empty else 0
+    print("平均獲利 %s" % avg_earn ,"%")
+    
+    earn_trade = trade1[trade1["get"] > 0]
+    earn_ratio = earn_trade.shape[0] / trade1.shape[0] if trade1.shape[0] > 0 else 0
+    max_earn = earn_trade["get"].max() if not earn_trade.empty else 0
+    print("最大獲利 %s" % max_earn)
+    
+    loss_trade = trade1[trade1["ret"] <= 0]
+    loss_ratio = round(loss_trade["ret"].mean(), 4) if not loss_trade.empty else 0
+    print("平均虧損 %s" % loss_ratio , "%")
+    
+    loss_trade = trade1[trade1["get"] <= 0]
+    loss_ratio = loss_trade["get"].min() if not loss_trade.empty else 0
+    print("最大虧損 %s" % loss_ratio)
+    
+    profit = earn_trade["get"].sum() + loss_trade["get"].sum()
+    print("總獲利 %s" % profit)
+    
+    # 避免除以零
+    odds = abs(avg_earn / loss_ratio) if loss_ratio != 0 else float('inf')
+    print("賺賠比 %s" % round(odds, 4))
+
+    exp_value = round((earn_ratio * odds - (1 - earn_ratio)), 4)
+    print("期望值 %s" % exp_value)
+    
+    # 最大回撤和新高计算
+    DD = []
+    NewHigh = []
+    TDD = 0 
+    MDD = 0 
+    acc_profit = 0
+    
+    for ret in trade1["ret"]:
+        acc_profit += ret
+        TDD += ret
+        if TDD > 0:
+            TDD = 0  
+            NewHigh.append(acc_profit)
+        else:
+            NewHigh.append(None)
+            MDD = min(MDD, TDD)
+        DD.append(TDD)
+    
+    print("最大資金回落 %s" % MDD.round(4),"%")
+    return True
+Performance(trade)
