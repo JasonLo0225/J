@@ -16,7 +16,7 @@ def getMdata(csv):
     a = pd.read_csv(csv)
     a.columns = [i for i in a.columns]
     return a
-data = getMdata("C:/Users/92275/Downloads/1K 999.csv")
+data = getMdata("C:/Users/92275/Downloads/15KKK.csv")
 data1 = data.set_index("Date")
 print(data1)
 position = 0
@@ -27,16 +27,21 @@ trade = pd.DataFrame(columns=[
     'cover_price',
     '損益',
     'get',
-    "ret"])
+    "ret",
+    "count"])
 bg = 100000
 count = 0
 count1 = 0
+first_entries = data.groupby('Date').first().reset_index()
 for d in range(data.shape[0]-1):
     c_time = data.index[d]
     date = data.loc[c_time,"Date"]
     time = data.loc[c_time,"Time"]
-    td_high = data.loc[data.index[0],"High"]
-    td_low = data.loc[data.index[0],"Low"]
+    
+    daily_data = first_entries[first_entries['Date'] == date]
+    td_high = daily_data['High'].values[0] if not daily_data.empty else None
+    td_low = daily_data['Low'].values[0] if not daily_data.empty else None
+    
     c_open = data.loc[c_time,"Open"]
     c_close = data.loc[c_time,"Close"]
     c_high = data.loc[c_time,"High"]
@@ -46,14 +51,17 @@ for d in range(data.shape[0]-1):
     date1 = data.loc[n_time,"Date"]
     time1 = data.loc[n_time,"Time"]
     n_open = data.loc[n_time,"Open"]
-    max15 =data["High"].rolling(20).max()
+    ma5 =data["Close"].rolling(5).mean()
+    ma10 =data["Close"].rolling(10).mean()
+    ma20 =data["Close"].rolling(20).mean()
+
     cover_price_next = data.loc[n_time, "Close"]
     volumn_next = data.loc[n_time, "Volumn"]
     if position == 0:
-        if cover_price_next < max15[d] and volumn_next > c_volumn and c_close < td_low:
+        if cover_price_next < ma5[d]  and volumn_next > c_volumn and c_close < td_low:
             position = -1
             order_d = d
-            order_price = n_open
+            order_price = c_close
             order_unit = 1
             print(date,time,"觸發進場訊號 進場",date,time,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
             
@@ -63,8 +71,7 @@ for d in range(data.shape[0]-1):
             count=count+1
             cover_price = data.loc[data.index[d-1],"Close"]
             cover_time = data.loc[data.index[d-1],"Time"]
-            bg_get = 50*(bg*(1+(cover_price-order_price)/order_price)-bg) 
-
+            bg_get = bg+50*(order_price-cover_price)-bg 
             print(date,time,"觸發出場訊號 出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
             ret = 100*(bg_get/bg)
             new_row = pd.Series(
@@ -75,17 +82,18 @@ for d in range(data.shape[0]-1):
                     cover_price,
                     "損益",
                     bg_get,
-                    ret
+                    ret,
+                    count,
                     ],
                 index=trade.columns
                 )
             new_row_df = new_row.to_frame().T
             # 使用 pd.concat 进行合并
             trade = pd.concat([trade, new_row_df], ignore_index=True)
-        elif (c_close-order_price)< -45:
+        elif (c_close-order_price)< -75:
             position = 0 
             count=count+1
-            cover_price = c_close
+            cover_price = order_price -74
             cover_time = time
             bg_get = bg+50*(order_price-cover_price)-bg
             print(date,cover_time,"觸發出場訊號 出場",date1,cover_time,"出場價",cover_price,"部位",position,bg_get,count)
@@ -98,7 +106,8 @@ for d in range(data.shape[0]-1):
                     cover_price,
                     "損益",
                     bg_get,
-                    ret
+                    ret,
+                    count,
                     ],
                 index=trade.columns
                 )
@@ -106,10 +115,10 @@ for d in range(data.shape[0]-1):
             # 使用 pd.concat 进行合并
             trade = pd.concat([trade, new_row_df], ignore_index=True)
 
-        elif (c_high - order_price) >25 :
+        elif (c_high - order_price) >23 :
             position = 0
-            count1=count1+1
-            cover_price =order_price +20
+            count1 = count1 - 1
+            cover_price =order_price +24
             cover_time = time
             bg_loss = bg+50*(order_price-cover_price)-bg
             ret = 100*(bg_loss/bg)
@@ -122,7 +131,8 @@ for d in range(data.shape[0]-1):
                     cover_price,
                     "損益",
                     bg_loss,
-                    ret
+                    ret,
+                    count1,
                     ],
                 index=trade.columns
                 )
@@ -171,6 +181,17 @@ def Performance(trade=pd.DataFrame()):
     profit = earn_trade["get"].sum() + loss_trade["get"].sum()
     print("總獲利 %s" % profit)
     
+    profit = earn_trade["get"].sum() + loss_trade["get"].sum()
+    p_percentage = (profit / bg)*100
+    print("總獲利百分 %s" % p_percentage , "%")
+    
+    count_get =trade1[trade1["count"] > 0]
+    count_loss = trade1[trade1["count"] < 0]
+    getsum = count_get["count"].max()
+    losssum = count_loss["count"].min()
+    aa = 100*(getsum / (getsum + (losssum *-1)))
+    print("勝率 %s" %  aa,"%")
+    
     # 避免除以零
     odds = abs(avg_earn / loss_ratio) if loss_ratio != 0 else float('inf')
     print("賺賠比 %s" % round(odds, 4))
@@ -196,6 +217,6 @@ def Performance(trade=pd.DataFrame()):
             MDD = min(MDD, TDD)
         DD.append(TDD)
     
-    print("最大資金回落 %s" % MDD.round(4),"%")
+    print("最大資金回落 %s" % round(MDD,4),"%")
     return True
 Performance(trade)
