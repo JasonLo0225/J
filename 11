@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Sep 16 14:43:50 2024
+Created on Thu Sep 19 11:48:16 2024
 
 @author: 92275
 """
@@ -10,8 +10,6 @@ import numpy
 import requests
 import chardet
 # import mplfinance as mpf
-
-
 def getMdata(csv):
     a = pd.read_csv(csv)
     a.columns = [i for i in a.columns]
@@ -29,36 +27,41 @@ trade = pd.DataFrame(columns=[
     'get',
     "ret",
     "count"])
-bg = 100000
+bg = 1000000
 count = 0
 count1 = 0
 first_entries = data.groupby('Date').first().reset_index()
+    
 for d in range(data.shape[0]-1):
     c_time = data.index[d]
     date = data.loc[c_time,"Date"]
     time = data.loc[c_time,"Time"]
-    
     daily_data = first_entries[first_entries['Date'] == date]
+    # 計算當日的最高點和最低點
+    daily_data1 = data[data['Date'] == date]
+    d_high = daily_data1['High'].max() if not daily_data1.empty else None
+    d_low = daily_data1['Low'].min() if not daily_data1.empty else None
+    # 每日開盤高低點
     td_high = daily_data['High'].values[0] if not daily_data.empty else None
     td_low = daily_data['Low'].values[0] if not daily_data.empty else None
-    
     c_open = data.loc[c_time,"Open"]
     c_close = data.loc[c_time,"Close"]
     c_high = data.loc[c_time,"High"]
     c_low = data.loc[c_time,"Low"]
     c_volumn = data.loc[c_time,"Volumn"]
     n_time = data.index[d+1]
+    b_time = data.index[d-1]
     date1 = data.loc[n_time,"Date"]
     time1 = data.loc[n_time,"Time"]
     n_open = data.loc[n_time,"Open"]
     ma5 =data["Close"].rolling(5).mean()
     ma10 =data["Close"].rolling(10).mean()
     ma20 =data["Close"].rolling(20).mean()
+    max15 =data["High"].rolling(20).max()
+    volumn_back = data.loc[b_time,"Volumn"]
 
-    cover_price_next = data.loc[n_time, "Close"]
-    volumn_next = data.loc[n_time, "Volumn"]
     if position == 0:
-        if cover_price_next < ma5[d]  and volumn_next > c_volumn and c_close < td_low:
+        if c_close < ma5[d]  and c_close < ma20[d] :
             position = -1
             order_d = d
             order_price = c_close
@@ -71,7 +74,7 @@ for d in range(data.shape[0]-1):
             count=count+1
             cover_price = data.loc[data.index[d-1],"Close"]
             cover_time = data.loc[data.index[d-1],"Time"]
-            bg_get = bg+50*(order_price-cover_price)-bg 
+            bg_get = bg+200*(order_price-cover_price)-bg 
             print(date,time,"觸發出場訊號 出場",date,time,"出場價(隔日)",cover_price,"部位",position,bg_get,count)
             ret = 100*(bg_get/bg)
             new_row = pd.Series(
@@ -90,12 +93,12 @@ for d in range(data.shape[0]-1):
             new_row_df = new_row.to_frame().T
             # 使用 pd.concat 进行合并
             trade = pd.concat([trade, new_row_df], ignore_index=True)
-        elif (c_close-order_price)< -75:
+        elif (c_close-order_price)< -100:
             position = 0 
             count=count+1
-            cover_price = order_price -74
+            cover_price = order_price - 101
             cover_time = time
-            bg_get = bg+50*(order_price-cover_price)-bg
+            bg_get = bg+200*(order_price-cover_price)-bg
             print(date,cover_time,"觸發出場訊號 出場",date1,cover_time,"出場價",cover_price,"部位",position,bg_get,count)
             ret = 100*(bg_get/bg)
             new_row = pd.Series(
@@ -114,13 +117,12 @@ for d in range(data.shape[0]-1):
             new_row_df = new_row.to_frame().T
             # 使用 pd.concat 进行合并
             trade = pd.concat([trade, new_row_df], ignore_index=True)
-
-        elif (c_high - order_price) >23 :
+        elif (c_high - order_price) >25 :
             position = 0
             count1 = count1 - 1
-            cover_price =order_price +24
+            cover_price =order_price +25
             cover_time = time
-            bg_loss = bg+50*(order_price-cover_price)-bg
+            bg_loss = bg+200*(order_price-cover_price)-bg
             ret = 100*(bg_loss/bg)
             print(date,time,"觸發出場訊號 出場",date,cover_time,"出場",cover_price,"部位",position,bg_loss,count1)
             new_row = pd.Series(
@@ -137,9 +139,7 @@ for d in range(data.shape[0]-1):
                 index=trade.columns
                 )
             new_row_df = new_row.to_frame().T
-
             trade = pd.concat([trade, new_row_df], ignore_index=True)
-
 def Performance(trade=pd.DataFrame()):
     if trade.shape[0] == 0:
         print("沒有交易紀錄")
