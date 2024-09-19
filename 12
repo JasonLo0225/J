@@ -1,41 +1,252 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 31 03:17:02 2024
+Created on Wed Sep 18 15:48:04 2024
 
-@author: jason
+@author: 92275
 """
 
-import yfinance as yf
 import pandas as pd
+import numpy
+import requests
+import chardet
+# import mplfinance as mpf
 
-# 獲取微軟股票的歷史數據
-msft = yf.Ticker("0050.TW")
-hist = msft.history(period="5y")
 
-# 計算微軟股票的布林通道
-sma20 = hist["Close"].rolling(window=20).mean()
-std20 = hist["Close"].rolling(window=20).std()
-upper_band = sma20 + 2 * std20
-lower_band = sma20 - 2 * std20
+def getMdata(csv):
+    a = pd.read_csv(csv)
+    a.columns = [i for i in a.columns]
+    return a
 
-balance_history = {}
-
-# 計算策略的報酬率
-balance = 100000  # 初始資金
-stock = 0  # 持有股票數量
-for i in range(len(hist)):
-    if hist["Close"].iloc[i] > upper_band.iloc[i] and stock == 0:
-        # 買入股票
-        stock = balance // hist["Close"].iloc[i]
-        balance -= stock * hist["Close"].iloc[i]
-    elif hist["Close"].iloc[i] < lower_band.iloc[i] and stock > 0:
-        # 賣出股票
-        balance += stock * hist["Close"].iloc[i]
-        stock = 0
+data = getMdata("C:/Users/92275/Downloads/5KKK.csv")
+data1 = data.set_index("Date")
+print(data1)
+position = 0
+trade = pd.DataFrame(columns=[
+    "date",
+    "cover_time",
+    'Sell',
+    'cover_price',
+    '損益',
+    'get',
+    "ret",
+    "count",])
+bg = 1000000
+count = 0
+count1 = 0
+first_entries = data.groupby('Date').first().reset_index()
+for d in range(data.shape[0]-1):
+    c_time = data.index[d]
+    date = data.loc[c_time,"Date"]
+    time = data.loc[c_time,"Time"]
+    daily_data = first_entries[first_entries['Date'] == date]
+    td_high = daily_data['High'].values[0] if not daily_data.empty else None
+    td_low = daily_data['Low'].values[0] if not daily_data.empty else None
+    c_open = data.loc[c_time,"Open"]
+    c_close = data.loc[c_time,"Close"]
+    c_high = data.loc[c_time,"High"]
+    c_low = data.loc[c_time,"Low"]
+    c_volumn = data.loc[c_time,"Volumn"]
+    n_time = data.index[d+1]
+    date1 = data.loc[n_time,"Date"]
+    time1 = data.loc[n_time,"Time"]
+    n_open = data.loc[n_time,"Open"]
+    d_low = data.loc[data.index[-d],"Low"]
     
-    balance_history[hist.index[i]] = (balance + stock * hist['Close'].iloc[i])
+    ma5 =data["Close"].rolling(5).mean()
+    ma10 =data["Close"].rolling(10).mean()
+    ma20 =data["Close"].rolling(20).mean()
 
-# 計算最終的報酬率
-final_value = balance + stock * hist["Close"].iloc[-1]
-return_rate = (final_value - 100000) / 100000
-print("最終報酬率：%.2f%%" % (return_rate * 100))
+    max5 =data["High"].rolling(5).max()
+    cover_price_next = data.loc[n_time, "Close"]
+    volumn_next = data.loc[n_time, "Volumn"]
+    if position == 0:
+        if cover_price_next> max5[d] and volumn_next > c_volumn and c_close > td_high:
+            position = 1
+            order_d = d
+            order_price = c_close
+            order_low = c_low
+            order_open = c_open
+            order_high = c_high
+            order_unit = 1
+            print(date,time,"觸發進場訊號 進場",date,time,"進場價",order_price,"進場",order_unit,"單位","部位" , position)
+            
+    elif position == 1:
+        if  (date > data.loc[data.index[d-1],"Date"]):
+            position = 0 
+            count=count+1
+            cover_price = data.loc[data.index[d-1],"Close"]
+            cover_time = data.loc[data.index[d-1],"Time"]
+            bg_get = bg+50*(cover_price-order_price) -bg
+            print(date,time,"觸發出場訊號 出場",date,time,"出場價(昨日)",cover_price,"部位",position,bg_get,count)
+            ret = 100*(bg_get/bg)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_get,
+                    ret,
+                    count,
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+            # 使用 pd.concat 进行合并
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+        elif (c_close-order_price)>75:
+            position = 0 
+            count=count+1
+            cover_price = order_price+75
+            cover_time = time
+            bg_get = bg+50*(cover_price-order_price)-bg
+            print(date,cover_time,"觸發出場訊號 出場",date1,cover_time,"出場價",cover_price,"部位",position,bg_get,count)
+            ret = 100*(bg_get/bg)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_get,
+                    ret,
+                    count,
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+            # 使用 pd.concat 进行合并
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+        elif c_close < order_low -25:
+            position = 0
+            count1=count1-1
+            cover_price = c_close
+            cover_time = time
+            bg_loss = bg+50*(cover_price-order_price)-bg
+            ret = 100*(bg_loss/bg)
+            print(date,time,"觸發出場訊號 出場",date,cover_time,"出場1",cover_price,"部位",position,bg_loss,count1)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_loss,
+                    ret,
+                    count1,
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+       
+        elif (c_close - order_price) <-25 and c_close < td_low-25 :
+            position = 0
+            count1=count1-1
+            cover_price = c_close
+            cover_time = time
+            bg_loss = bg+50*(cover_price-order_price)-bg
+            ret = 100*(bg_loss/bg)
+            print(date,time,"觸發出場訊號 出場",date,cover_time,"出場1",cover_price,"部位",position,bg_loss,count1)
+            new_row = pd.Series(
+                [
+                    date,
+                    cover_time,
+                    "Sell",
+                    cover_price,
+                    "損益",
+                    bg_loss,
+                    ret,
+                    count1,
+                    ],
+                index=trade.columns
+                )
+            new_row_df = new_row.to_frame().T
+
+            trade = pd.concat([trade, new_row_df], ignore_index=True)
+
+def Performance(trade=pd.DataFrame()):
+    if trade.shape[0] == 0:
+        print("沒有交易紀錄")
+        return False
+    
+    # 确保 'ret' 列存在
+    if 'ret' not in trade.columns:
+        print("DataFrame 中不包含 'ret' 列")
+        return False
+    
+    trade1 = trade.copy()
+    # 确保以某一列进行排序（假设这里是 'ret' 列）
+    trade1 = trade1.sort_values(by='ret')
+    trade1 = trade1.reset_index(drop=True)
+    
+    # 打印交易次数和平均绩效
+    print("交易次數 %s" % trade1.shape[0])   
+        
+    avg_ret = round(trade1["ret"].mean(), 4)
+    print("平均績效 %s" % avg_ret ,"%")
+    
+    earn_trade = trade1[trade1["ret"] > 0]
+    earn_ratio = earn_trade.shape[0] / trade1.shape[0] if trade1.shape[0] > 0 else 0
+    avg_earn = round(earn_trade["ret"].mean(), 4) if not earn_trade.empty else 0
+    print("平均獲利 %s" % avg_earn ,"%")
+    
+    earn_trade = trade1[trade1["get"] > 0]
+    earn_ratio = earn_trade.shape[0] / trade1.shape[0] if trade1.shape[0] > 0 else 0
+    max_earn = earn_trade["get"].max() if not earn_trade.empty else 0
+    print("最大獲利 %s" % max_earn)
+    
+    loss_trade = trade1[trade1["ret"] <= 0]
+    loss_ratio = round(loss_trade["ret"].mean(), 4) if not loss_trade.empty else 0
+    print("平均虧損 %s" % loss_ratio , "%")
+    
+    loss_trade = trade1[trade1["get"] <= 0]
+    loss_ratio = loss_trade["get"].min() if not loss_trade.empty else 0
+    print("最大虧損 %s" % loss_ratio)
+    
+    profit = earn_trade["get"].sum() + loss_trade["get"].sum()
+    print("總獲利 %s" % profit)
+    
+    profit = earn_trade["get"].sum() + loss_trade["get"].sum()
+    p_percentage = (profit / bg)*100
+    print("總獲利百分 %s" % p_percentage , "%")
+    
+    count_get =trade1[trade1["count"] > 0]
+    count_loss = trade1[trade1["count"] < 0]
+    getsum = count_get["count"].max()
+    losssum = count_loss["count"].min()
+    aa = 100*(getsum / (getsum + (losssum *-1)))
+    print("勝率 %s" %  aa,"%")
+    
+    # 避免除以零
+    odds = abs(avg_earn / loss_ratio) if loss_ratio != 0 else float('inf')
+    print("賺賠比 %s" % round(odds, 4))
+
+    exp_value = round((earn_ratio * odds - (1 - earn_ratio)), 4)
+    print("期望值 %s" % exp_value)
+    
+    # 最大回撤和新高计算
+    DD = []
+    NewHigh = []
+    TDD = 0 
+    MDD = 0 
+    acc_profit = 0
+    
+    for ret in trade1["ret"]:
+        acc_profit += ret
+        TDD += ret
+        if TDD > 0:
+            TDD = 0  
+            NewHigh.append(acc_profit)
+        else:
+            NewHigh.append(None)
+            MDD = min(MDD, TDD)
+        DD.append(TDD)
+    
+    print("最大資金回落 %s" % round(MDD, 4),"%")
+    return True
+Performance(trade)
