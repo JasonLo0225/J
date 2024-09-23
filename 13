@@ -1,0 +1,26 @@
+Public uMode&, StartT, EndT
+Public Mbook As Workbook, Sht1 As Worksheet, Sht2 As Worksheet, xRow&
+Sub 共同使用()
+Set Mbook = ThisWorkbook
+Set Sht1 = Mbook.Sheets("資料圖表區")
+StartT = "08:44:50"
+EndT = "13:45:00"
+End Sub
+
+Sub 自動記載()
+If uMode = 0 Then Exit Sub
+If Time > TimeValue(EndT) Then
+    Sht1.[O18] = "已過收盤"
+    uMode = 0
+    Exit Sub
+End If
+Sht1.Range("B18") = Time
+
+If Second(Time) = 0 And Minute(Time) Mod 1 = 0 Then
+    xRow = Sht1.Range("A65536").End(xlUp).Row + 1
+    If xRow < 19 Then xRow = 19
+    Sht1.Range("A" & xRow & ":N" & xRow).Value = Sht1.Range("A18:N18").Value
+    If ActiveSheet.Name = Sht1.Name And xRow > 20 Then
+        ActiveWindow.ScrollRow = xRow - 18
+    End If
+    ThisWorkbook.Save
