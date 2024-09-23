@@ -57,11 +57,12 @@ for d in range(data.shape[0]-1):
     max15 =data["High"].rolling(20).max()
     volumn_back = data.loc[b_time,"Volumn"]
     # Get time values for the next and previous entries
-    time_current = data.loc[data.index[d], 'Time']
-    time_previous = data.loc[data.index[d-1], 'Time']
+    time_current = int((data.loc[data.index[d], 'Time']).replace(":",""))
+    time_previous = int(data.loc[data.index[d-1], 'Time'].replace(":",""))
 
     # Calculate the time difference in minutes
-    time_diff_minutes = (time_current - time_previous).total_seconds() / 60
+    time_diff_minutes = (time_current - time_previous) ==500
+    print(time_diff_minutes)
 
     # Classify based on time difference
     if time_diff_minutes == 5:
