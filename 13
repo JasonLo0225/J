@@ -24,3 +24,22 @@ If Second(Time) = 0 And Minute(Time) Mod 1 = 0 Then
         ActiveWindow.ScrollRow = xRow - 18
     End If
     ThisWorkbook.Save
+    Beep
+End If
+Application.OnTime Now + TimeValue("00:00:01"), "自動記載"
+
+End Sub
+
+Sub 執行()
+If uMode = 1 Then Exit Sub
+Call 共同使用
+uMode = 1
+Sht1.[O18] = "執行中"
+Call 自動記載
+End Sub
+
+Sub 停止()
+uMode = 0
+Call 共同使用
+Sht1.[O18] = "停止中"
+End Sub
